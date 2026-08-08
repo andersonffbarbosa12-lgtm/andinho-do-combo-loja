@@ -289,9 +289,19 @@ export default function Home() {
       </header>
 
       <div className="mx-auto max-w-6xl">
-
-        {/* BANNER */}
-        <section className="px-4 pt-4">
+{/* BANNER PRINCIPAL */}
+<section className="px-4 pt-4">
+  <button
+    onClick={() => setCategory("Ofertas")}
+    className="block w-full overflow-hidden rounded-2xl border border-yellow-500/20 bg-black shadow-2xl"
+  >
+    <img
+      src="/banner-andinho.png"
+      alt="Andinho do Combo - Bebidas e Delivery"
+      className="h-auto w-full object-cover"
+    />
+  </button>
+</section>
 
           <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/20 bg-gradient-to-br from-[#181818] via-[#101010] to-black p-6 shadow-2xl">
 
