@@ -444,7 +444,26 @@ const filteredProducts = products.filter((product) => {
           </div>
 
         </section>
+{!isOpen && (
+  <section className="px-4 pt-4">
+    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+      <div className="flex items-start gap-3">
+        <div className="text-2xl">🔴</div>
 
+        <div>
+          <p className="font-black text-red-400">
+            Loja fechada no momento
+          </p>
+
+          <p className="mt-1 text-sm text-gray-400">
+            Abrimos às 14:00. Você pode montar seu carrinho normalmente,
+            mas os pedidos só poderão ser finalizados quando a loja abrir.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+)}
         {/* CATEGORIAS */}
         <section className="pt-5">
 
