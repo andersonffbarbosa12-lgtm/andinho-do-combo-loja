@@ -532,13 +532,16 @@ export default function Home() {
       {/* CARRINHO FIXO */}
       <div className="fixed bottom-4 left-0 right-0 z-50 px-4">
 
-        <button
-          className={`mx-auto flex w-full max-w-md items-center justify-between rounded-2xl px-5 py-4 font-black shadow-2xl ${
-            totalItems > 0
-              ? "bg-yellow-400 text-black"
-              : "bg-[#1b1b1b] text-gray-500"
-          }`}
-        >
+     <button
+  onClick={() => {
+    window.location.href = "/carrinho";
+  }}
+  className={`mx-auto flex w-full max-w-md items-center justify-between rounded-2xl px-5 py-4 font-black shadow-2xl ${
+    totalItems > 0
+      ? "bg-yellow-400 text-black"
+      : "bg-[#1b1b1b] text-gray-500"
+  }`}
+>
           <span>
             🛒 Carrinho
             {totalItems > 0 &&
