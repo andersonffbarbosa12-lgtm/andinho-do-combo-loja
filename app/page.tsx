@@ -238,8 +238,6 @@ const filteredProducts = products.filter((product) => {
 
   return getCategoryName(product) === category;
 });
-    return getCategoryName(product) === category;
-  });
 
   const featuredProducts = products.filter(
     (product) => product.featured
