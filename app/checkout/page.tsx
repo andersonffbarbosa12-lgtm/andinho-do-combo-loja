@@ -317,9 +317,7 @@ export default function CheckoutPage() {
         Na próxima etapa vamos colocar
         seu número real de WhatsApp aqui.
       */
-
-      const whatsappNumber = "55SEUNUMERO";
-
+      const whatsappNumber = "5524992359332";
       const whatsappUrl =
         `https://wa.me/${whatsappNumber}?text=${message}`;
 
