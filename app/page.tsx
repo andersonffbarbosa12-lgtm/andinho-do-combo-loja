@@ -620,6 +620,15 @@ const filteredProducts = products.filter((product) => {
                 const hasDiscount =
                   product.promotional_price !== null;
 
+              const discountPercent =
+  hasDiscount && product.promotional_price !== null
+    ? Math.round(
+        ((product.price - product.promotional_price) /
+          product.price) *
+          100
+      )
+    : 0;
+
                 return (
                   <article
                     key={product.id}
@@ -641,11 +650,12 @@ const filteredProducts = products.filter((product) => {
                         </span>
                       )}
 
-                      {product.on_sale && (
-                        <span className="absolute left-3 top-3 rounded-full bg-yellow-400 px-3 py-1 text-[10px] font-black text-black">
-                          OFERTA
-                        </span>
-                      )}
+                      {(product.on_sale || hasDiscount) && (
+  <span className="absolute left-3 top-3 rounded-full bg-yellow-400 px-3 py-1 text-[10px] font-black text-black shadow-lg">
+    🔥 OFERTA
+    {discountPercent > 0 && ` • -${discountPercent}%`}
+  </span>
+)}
 
                       {product.stock > 0 &&
                         product.stock <= 5 && (
