@@ -482,6 +482,7 @@ const filteredProducts = products.filter((product) => {
         </section>
 
         {/* DESTAQUES */}
+        
         {featuredProducts.length > 0 && !search.trim() && (
 
             <div className="mb-4 flex items-end justify-between">
