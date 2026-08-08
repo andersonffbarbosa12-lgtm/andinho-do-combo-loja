@@ -482,87 +482,87 @@ const filteredProducts = products.filter((product) => {
         </section>
 
         {/* DESTAQUES */}
-        
-        {featuredProducts.length > 0 && !search.trim() && (
+{featuredProducts.length > 0 && !search.trim() && (
+  <section className="px-4 pt-7">
 
-            <div className="mb-4 flex items-end justify-between">
+    <div className="mb-4 flex items-end justify-between">
 
-              <div>
-                <p className="text-xs font-bold text-yellow-400">
-                  SELEÇÃO ESPECIAL
-                </p>
+      <div>
+        <p className="text-xs font-bold text-yellow-400">
+          SELEÇÃO ESPECIAL
+        </p>
 
-                <h2 className="text-2xl font-black">
-                  Destaques
-                </h2>
-              </div>
+        <h2 className="text-2xl font-black">
+          Destaques
+        </h2>
+      </div>
 
-              <span className="text-xs text-gray-500">
-                Mais procurados
+      <span className="text-xs text-gray-500">
+        Mais procurados
+      </span>
+
+    </div>
+
+    <div className="flex gap-3 overflow-x-auto pb-2">
+
+      {featuredProducts.map((product) => {
+        const price =
+          product.promotional_price ??
+          product.price;
+
+        return (
+          <article
+            key={product.id}
+            className="min-w-[220px] overflow-hidden rounded-3xl border border-yellow-500/20 bg-[#131313]"
+          >
+
+            <div className="flex aspect-square items-center justify-center bg-[#0b0b0b]">
+
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="h-full w-full object-contain p-4"
+                />
+              ) : (
+                <span className="text-7xl">
+                  🥃
+                </span>
+              )}
+
+            </div>
+
+            <div className="p-4">
+
+              <span className="rounded-full bg-yellow-400 px-2 py-1 text-[10px] font-black text-black">
+                DESTAQUE
               </span>
 
-            </div>
+              <h3 className="mt-3 font-black">
+                {product.name}
+              </h3>
 
-            <div className="flex gap-3 overflow-x-auto pb-2">
+              {product.volume && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {product.volume}
+                </p>
+              )}
 
-              {featuredProducts.map((product) => {
-                const price =
-                  product.promotional_price ??
-                  product.price;
-
-                return (
-                  <article
-                    key={product.id}
-                    className="min-w-[220px] overflow-hidden rounded-3xl border border-yellow-500/20 bg-[#131313]"
-                  >
-
-                    <div className="flex aspect-square items-center justify-center bg-[#0b0b0b]">
-
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="h-full w-full object-contain p-4"
-                        />
-                      ) : (
-                        <span className="text-7xl">
-                          🥃
-                        </span>
-                      )}
-
-                    </div>
-
-                    <div className="p-4">
-
-                      <span className="rounded-full bg-yellow-400 px-2 py-1 text-[10px] font-black text-black">
-                        DESTAQUE
-                      </span>
-
-                      <h3 className="mt-3 font-black">
-                        {product.name}
-                      </h3>
-
-                      {product.volume && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          {product.volume}
-                        </p>
-                      )}
-
-                      <p className="mt-3 text-xl font-black text-yellow-400">
-                        {formatPrice(price)}
-                      </p>
-
-                    </div>
-
-                  </article>
-                );
-              })}
+              <p className="mt-3 text-xl font-black text-yellow-400">
+                {formatPrice(price)}
+              </p>
 
             </div>
 
-          </section>
-        )}
+          </article>
+        );
+      })}
 
+    </div>
+
+  </section>
+)}
+        
         {/* PRODUTOS */}
         <section className="px-4 pt-8">
 
