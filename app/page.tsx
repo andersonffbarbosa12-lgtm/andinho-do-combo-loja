@@ -1,6 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+type Product = {
+  id: string;
+  name: string;
+  description: string | null;
+  volume: string | null;
+  image_url: string | null;
+  price: number;
+  promotional_price: number | null;
+  stock: number;
+  featured: boolean;
+  on_sale: boolean;
+  category_id: string | null;
+  categories:
+    | {
+        name: string;
+      }
+    | {
+        name: string;
+      }[]
+    | null;
+};
 
 const categories = [
   { icon: "🔥", name: "Ofertas" },
@@ -13,12 +36,76 @@ const categories = [
   { icon: "🎁", name: "Combos" },
 ];
 
+function formatPrice(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+function getCategoryName(product: Product) {
+  if (!product.categories) return "";
+
+  if (Array.isArray(product.categories)) {
+    return product.categories[0]?.name ?? "";
+  }
+
+  return product.categories.name;
+}
+
 export default function Home() {
   const [category, setCategory] = useState("Ofertas");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProducts() {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          description,
+          volume,
+          image_url,
+          price,
+          promotional_price,
+          stock,
+          featured,
+          on_sale,
+          category_id,
+          categories (
+            name
+          )
+        `)
+        .eq("active", true)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar produtos:", error);
+        setProducts([]);
+      } else {
+        setProducts((data as Product[]) ?? []);
+      }
+
+      setLoading(false);
+    }
+
+    loadProducts();
+  }, []);
+
+  const filteredProducts = products.filter((product) => {
+    if (category === "Ofertas") {
+      return product.on_sale || product.promotional_price !== null;
+    }
+
+    return getCategoryName(product) === category;
+  });
 
   return (
-    <main className="min-h-screen bg-[#080808] text-white pb-24">
-
+    <main className="min-h-screen bg-[#080808] pb-24 text-white">
       {/* CABEÇALHO */}
       <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-black/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
@@ -42,7 +129,6 @@ export default function Home() {
       </header>
 
       <div className="mx-auto max-w-6xl">
-
         {/* BANNER */}
         <section className="px-4 pt-4">
           <div className="overflow-hidden rounded-3xl border border-yellow-500/20 bg-gradient-to-r from-[#151515] to-black p-6 shadow-2xl">
@@ -53,16 +139,17 @@ export default function Home() {
             <h2 className="mt-4 text-3xl font-black">
               Sua bebida,
               <br />
-              <span className="text-yellow-400">
-                seu combo.
-              </span>
+              <span className="text-yellow-400">seu combo.</span>
             </h2>
 
             <p className="mt-2 max-w-sm text-sm text-gray-400">
               Bebidas geladas, combos e entrega rápida.
             </p>
 
-            <button className="mt-5 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black">
+            <button
+              onClick={() => setCategory("Ofertas")}
+              className="mt-5 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black"
+            >
               VER OFERTAS
             </button>
           </div>
@@ -109,40 +196,106 @@ export default function Home() {
           </div>
         </section>
 
-        {/* DESTAQUES */}
+        {/* PRODUTOS */}
         <section className="px-4 pt-5">
-          <div className="mb-4 flex items-end justify-between">
-            <div>
-              <p className="text-xs font-bold text-yellow-400">
-                ANDINHO DO COMBO
-              </p>
-
-              <h2 className="text-2xl font-black">
-                Destaques
-              </h2>
-            </div>
-
-            <span className="text-sm text-gray-500">
-              {category}
-            </span>
-          </div>
-
-          {/* Enquanto ainda não conectamos os produtos */}
-          <div className="rounded-2xl border border-dashed border-yellow-500/30 bg-[#111] p-8 text-center">
-            <div className="text-4xl">🥃</div>
-
-            <h3 className="mt-3 font-bold">
-              Seus produtos aparecerão aqui
-            </h3>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Na próxima etapa vamos buscar automaticamente
-              os produtos cadastrados no Supabase.
+          <div className="mb-4">
+            <p className="text-xs font-bold text-yellow-400">
+              ANDINHO DO COMBO
             </p>
+
+            <h2 className="text-2xl font-black">
+              {category}
+            </h2>
           </div>
+
+          {loading ? (
+            <div className="rounded-2xl bg-[#111] p-8 text-center">
+              <p className="text-gray-400">
+                Carregando produtos...
+              </p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-yellow-500/30 bg-[#111] p-8 text-center">
+              <div className="text-4xl">🥃</div>
+
+              <h3 className="mt-3 font-bold">
+                Nenhum produto nesta categoria
+              </h3>
+
+              <p className="mt-2 text-sm text-gray-500">
+                Cadastre produtos no painel administrativo.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {filteredProducts.map((product) => {
+                const salePrice =
+                  product.promotional_price ?? product.price;
+
+                return (
+                  <article
+                    key={product.id}
+                    className="overflow-hidden rounded-2xl border border-white/10 bg-[#141414]"
+                  >
+                    <div className="flex aspect-square items-center justify-center bg-[#0d0d0d]">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="h-full w-full object-contain p-3"
+                        />
+                      ) : (
+                        <span className="text-6xl">🥃</span>
+                      )}
+                    </div>
+
+                    <div className="p-3">
+                      {product.on_sale && (
+                        <span className="rounded-md bg-yellow-400 px-2 py-1 text-[10px] font-black text-black">
+                          OFERTA
+                        </span>
+                      )}
+
+                      <h3 className="mt-2 font-bold">
+                        {product.name}
+                      </h3>
+
+                      {product.volume && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {product.volume}
+                        </p>
+                      )}
+
+                      {product.promotional_price !== null && (
+                        <p className="mt-2 text-xs text-gray-500 line-through">
+                          {formatPrice(product.price)}
+                        </p>
+                      )}
+
+                      <p className="text-lg font-black text-yellow-400">
+                        {formatPrice(salePrice)}
+                      </p>
+
+                      {product.stock > 0 ? (
+                        <button className="mt-3 w-full rounded-xl bg-yellow-400 px-3 py-3 text-sm font-black text-black">
+                          + ADICIONAR
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="mt-3 w-full rounded-xl bg-gray-800 px-3 py-3 text-sm font-bold text-gray-500"
+                        >
+                          ESGOTADO
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
 
-        {/* AVISO */}
         <section className="px-4 py-8 text-center text-xs text-gray-600">
           🔞 Venda proibida para menores de 18 anos.
           <br />
@@ -150,14 +303,13 @@ export default function Home() {
         </section>
       </div>
 
-      {/* CARRINHO FIXO */}
+      {/* CARRINHO */}
       <div className="fixed bottom-4 left-0 right-0 z-50 px-4">
         <button className="mx-auto flex w-full max-w-md items-center justify-between rounded-2xl bg-yellow-400 px-5 py-4 font-black text-black shadow-2xl">
           <span>🛒 Carrinho</span>
           <span>R$ 0,00</span>
         </button>
       </div>
-
     </main>
   );
-          }
+    }
