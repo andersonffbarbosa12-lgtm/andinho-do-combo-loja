@@ -274,7 +274,7 @@ const { error: orderError } =
       whatsapp_opened: true,
     });
 
-      if (orderError || !order) {
+      if (orderError) {
         console.error(orderError);
 
         alert(
@@ -286,7 +286,7 @@ const { error: orderError } =
       }
 
       const orderItems = cart.map((item) => ({
-        order_id: order.id,
+        order_id: orderId,
         product_id: item.id,
         product_name: item.name,
         quantity: item.quantity,
@@ -310,8 +310,8 @@ const { error: orderError } =
         return;
       }
 
-      const message =
-        buildWhatsAppMessage(order.id);
+      const message = 
+        buildWhatsAppMessage(orderId);;
 
       /*
         IMPORTANTE:
