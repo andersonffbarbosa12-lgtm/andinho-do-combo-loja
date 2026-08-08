@@ -126,7 +126,10 @@ export default function Home() {
   useEffect(() => {
     if (!cartLoaded) return;
 
-    localStorage.setItem("andinho-cart", JSON.stringify(cart));
+    localStorage.setItem(
+      "andinho-cart",
+      JSON.stringify(cart)
+    );
   }, [cart, cartLoaded]);
 
   function getProductPrice(product: Product) {
@@ -137,12 +140,12 @@ export default function Home() {
     const price = getProductPrice(product);
 
     setCart((currentCart) => {
-      const existingItem = currentCart.find(
+      const existing = currentCart.find(
         (item) => item.id === product.id
       );
 
-      if (existingItem) {
-        if (existingItem.quantity >= product.stock) {
+      if (existing) {
+        if (existing.quantity >= product.stock) {
           return currentCart;
         }
 
@@ -175,21 +178,6 @@ export default function Home() {
     });
   }
 
-  function decreaseItem(productId: string) {
-    setCart((currentCart) =>
-      currentCart
-        .map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                quantity: item.quantity - 1,
-              }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
-  }
-
   function increaseItem(productId: string) {
     setCart((currentCart) =>
       currentCart.map((item) => {
@@ -209,13 +197,35 @@ export default function Home() {
     );
   }
 
+  function decreaseItem(productId: string) {
+    setCart((currentCart) =>
+      currentCart
+        .map((item) =>
+          item.id === productId
+            ? {
+                ...item,
+                quantity: item.quantity - 1,
+              }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
   const filteredProducts = products.filter((product) => {
     if (category === "Ofertas") {
-      return product.on_sale || product.promotional_price !== null;
+      return (
+        product.on_sale ||
+        product.promotional_price !== null
+      );
     }
 
     return getCategoryName(product) === category;
   });
+
+  const featuredProducts = products.filter(
+    (product) => product.featured
+  );
 
   const totalItems = useMemo(() => {
     return cart.reduce(
@@ -233,25 +243,36 @@ export default function Home() {
   }, [cart]);
 
   return (
-    <main className="min-h-screen bg-[#080808] pb-32 text-white">
+    <main className="min-h-screen bg-[#070707] pb-32 text-white">
 
-      {/* CABEÇALHO */}
-      <header className="sticky top-0 z-50 border-b border-yellow-500/20 bg-black/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+      {/* TOPO */}
+      <header className="sticky top-0 z-50 border-b border-yellow-500/10 bg-black/95 backdrop-blur">
 
-          <div>
-            <h1 className="text-xl font-black tracking-wide text-yellow-400">
-              ANDINHO DO COMBO
-            </h1>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
 
-            <p className="text-xs text-gray-400">
-              Bebidas • Combos • Delivery
-            </p>
+          <div className="flex items-center gap-3">
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-yellow-400/30 bg-gradient-to-br from-yellow-300 to-yellow-600 font-black text-black shadow-lg">
+              AC
+            </div>
+
+            <div>
+              <h1 className="text-lg font-black tracking-wide text-yellow-400">
+                ANDINHO DO COMBO
+              </h1>
+
+              <p className="text-[11px] text-gray-500">
+                Bebidas • Combos • Delivery
+              </p>
+            </div>
+
           </div>
 
           <button
-            aria-label="Carrinho"
-            className="relative rounded-full border border-yellow-500/40 p-3"
+            onClick={() =>
+              (window.location.href = "/carrinho")
+            }
+            className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[#151515]"
           >
             🛒
 
@@ -260,98 +281,230 @@ export default function Home() {
                 {totalItems}
               </span>
             )}
+
           </button>
 
         </div>
+
       </header>
 
       <div className="mx-auto max-w-6xl">
 
         {/* BANNER */}
         <section className="px-4 pt-4">
-          <div className="overflow-hidden rounded-3xl border border-yellow-500/20 bg-gradient-to-r from-[#151515] to-black p-6 shadow-2xl">
 
-            <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-black">
-              DELIVERY
-            </span>
+          <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/20 bg-gradient-to-br from-[#181818] via-[#101010] to-black p-6 shadow-2xl">
 
-            <h2 className="mt-4 text-3xl font-black">
-              Sua bebida,
-              <br />
-              <span className="text-yellow-400">
-                seu combo.
+            <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-yellow-400/10 blur-3xl" />
+
+            <div className="relative">
+
+              <span className="inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-[11px] font-bold text-yellow-300">
+                ⚡ DELIVERY RÁPIDO
               </span>
-            </h2>
 
-            <p className="mt-2 max-w-sm text-sm text-gray-400">
-              Bebidas geladas, combos e entrega rápida.
-            </p>
+              <h2 className="mt-5 text-4xl font-black leading-none">
+                Sua bebida,
+                <br />
+                <span className="text-yellow-400">
+                  seu combo.
+                </span>
+              </h2>
 
-            <button
-              onClick={() => setCategory("Ofertas")}
-              className="mt-5 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black"
-            >
-              VER OFERTAS
-            </button>
+              <p className="mt-3 max-w-sm text-sm leading-6 text-gray-400">
+                Bebidas geladas, combos e praticidade
+                até 04:00.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2 text-xs">
+
+                <span className="rounded-full bg-white/5 px-3 py-2 text-gray-300">
+                  🚚 Delivery
+                </span>
+
+                <span className="rounded-full bg-white/5 px-3 py-2 text-gray-300">
+                  💠 Pix
+                </span>
+
+                <span className="rounded-full bg-white/5 px-3 py-2 text-gray-300">
+                  💳 Cartão no local
+                </span>
+
+              </div>
+
+              <button
+                onClick={() => setCategory("Ofertas")}
+                className="mt-6 rounded-2xl bg-yellow-400 px-6 py-4 font-black text-black shadow-lg"
+              >
+                VER OFERTAS 🔥
+              </button>
+
+            </div>
 
           </div>
+
         </section>
 
-        {/* INFORMAÇÕES */}
-        <section className="grid grid-cols-3 gap-2 px-4 py-4 text-center text-xs">
+        {/* STATUS DA LOJA */}
+        <section className="px-4 pt-4">
 
-          <div className="rounded-xl bg-[#141414] p-3">
-            🚚
-            <p className="mt-1 text-gray-300">
-              Delivery
-            </p>
-          </div>
+          <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#111] px-4 py-3">
 
-          <div className="rounded-xl bg-[#141414] p-3">
-            💳
-            <p className="mt-1 text-gray-300">
-              Pix ou cartão
-            </p>
-          </div>
+            <div className="flex items-center gap-3">
 
-          <div className="rounded-xl bg-[#141414] p-3">
-            🌙
-            <p className="mt-1 text-gray-300">
-              Até 04:00
-            </p>
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
+                🕒
+              </div>
+
+              <div>
+                <p className="text-sm font-bold">
+                  Atendimento
+                </p>
+
+                <p className="text-xs text-gray-500">
+                  Pedidos até 04:00
+                </p>
+              </div>
+
+            </div>
+
+            <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-bold text-green-400">
+              Delivery ativo
+            </span>
+
           </div>
 
         </section>
 
         {/* CATEGORIAS */}
-        <section>
-          <div className="flex gap-3 overflow-x-auto px-4 pb-3">
+        <section className="pt-5">
+
+          <div className="mb-3 flex items-center justify-between px-4">
+
+            <div>
+              <p className="text-xs font-bold text-yellow-400">
+                ESCOLHA RÁPIDO
+              </p>
+
+              <h2 className="text-xl font-black">
+                Categorias
+              </h2>
+            </div>
+
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto px-4 pb-2">
 
             {categories.map((item) => (
               <button
                 key={item.name}
                 onClick={() => setCategory(item.name)}
-                className={`min-w-[82px] rounded-2xl border p-3 text-center ${
+                className={`min-w-[88px] rounded-2xl border px-3 py-4 transition ${
                   category === item.name
                     ? "border-yellow-400 bg-yellow-400 text-black"
-                    : "border-white/10 bg-[#141414]"
+                    : "border-white/10 bg-[#131313] text-white"
                 }`}
               >
+
                 <div className="text-2xl">
                   {item.icon}
                 </div>
 
-                <div className="mt-1 text-xs font-bold">
+                <div className="mt-2 text-xs font-black">
                   {item.name}
                 </div>
+
               </button>
             ))}
 
           </div>
+
         </section>
 
+        {/* DESTAQUES */}
+        {featuredProducts.length > 0 && (
+          <section className="px-4 pt-7">
+
+            <div className="mb-4 flex items-end justify-between">
+
+              <div>
+                <p className="text-xs font-bold text-yellow-400">
+                  SELEÇÃO ESPECIAL
+                </p>
+
+                <h2 className="text-2xl font-black">
+                  Destaques
+                </h2>
+              </div>
+
+              <span className="text-xs text-gray-500">
+                Mais procurados
+              </span>
+
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-2">
+
+              {featuredProducts.map((product) => {
+                const price =
+                  product.promotional_price ??
+                  product.price;
+
+                return (
+                  <article
+                    key={product.id}
+                    className="min-w-[220px] overflow-hidden rounded-3xl border border-yellow-500/20 bg-[#131313]"
+                  >
+
+                    <div className="flex aspect-square items-center justify-center bg-[#0b0b0b]">
+
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="h-full w-full object-contain p-4"
+                        />
+                      ) : (
+                        <span className="text-7xl">
+                          🥃
+                        </span>
+                      )}
+
+                    </div>
+
+                    <div className="p-4">
+
+                      <span className="rounded-full bg-yellow-400 px-2 py-1 text-[10px] font-black text-black">
+                        DESTAQUE
+                      </span>
+
+                      <h3 className="mt-3 font-black">
+                        {product.name}
+                      </h3>
+
+                      {product.volume && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {product.volume}
+                        </p>
+                      )}
+
+                      <p className="mt-3 text-xl font-black text-yellow-400">
+                        {formatPrice(price)}
+                      </p>
+
+                    </div>
+
+                  </article>
+                );
+              })}
+
+            </div>
+
+          </section>
+        )}
+
         {/* PRODUTOS */}
-        <section className="px-4 pt-5">
+        <section className="px-4 pt-8">
 
           <div className="mb-4">
 
@@ -367,7 +520,7 @@ export default function Home() {
 
           {loading ? (
 
-            <div className="rounded-2xl bg-[#111] p-8 text-center">
+            <div className="rounded-3xl bg-[#111] p-10 text-center">
               <p className="text-gray-400">
                 Carregando produtos...
               </p>
@@ -375,25 +528,25 @@ export default function Home() {
 
           ) : filteredProducts.length === 0 ? (
 
-            <div className="rounded-2xl border border-dashed border-yellow-500/30 bg-[#111] p-8 text-center">
+            <div className="rounded-3xl border border-dashed border-yellow-500/30 bg-[#111] p-10 text-center">
 
-              <div className="text-4xl">
+              <div className="text-5xl">
                 🥃
               </div>
 
-              <h3 className="mt-3 font-bold">
-                Nenhum produto nesta categoria
+              <h3 className="mt-4 font-black">
+                Nenhum produto por aqui
               </h3>
 
               <p className="mt-2 text-sm text-gray-500">
-                Novos produtos aparecerão aqui.
+                Novos produtos aparecerão nesta categoria.
               </p>
 
             </div>
 
           ) : (
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
 
               {filteredProducts.map((product) => {
                 const salePrice =
@@ -404,38 +557,48 @@ export default function Home() {
                   (item) => item.id === product.id
                 );
 
+                const hasDiscount =
+                  product.promotional_price !== null;
+
                 return (
                   <article
                     key={product.id}
-                    className="overflow-hidden rounded-2xl border border-white/10 bg-[#141414]"
+                    className="overflow-hidden rounded-3xl border border-white/10 bg-[#131313] shadow-xl"
                   >
 
-                    {/* IMAGEM */}
-                    <div className="flex aspect-square items-center justify-center bg-[#0d0d0d]">
+                    {/* FOTO */}
+                    <div className="relative flex aspect-square items-center justify-center bg-[#0b0b0b]">
 
                       {product.image_url ? (
                         <img
                           src={product.image_url}
                           alt={product.name}
-                          className="h-full w-full object-contain p-3"
+                          className="h-full w-full object-contain p-4"
                         />
                       ) : (
-                        <span className="text-6xl">
+                        <span className="text-7xl">
                           🥃
                         </span>
                       )}
 
-                    </div>
-
-                    <div className="p-3">
-
                       {product.on_sale && (
-                        <span className="rounded-md bg-yellow-400 px-2 py-1 text-[10px] font-black text-black">
+                        <span className="absolute left-3 top-3 rounded-full bg-yellow-400 px-3 py-1 text-[10px] font-black text-black">
                           OFERTA
                         </span>
                       )}
 
-                      <h3 className="mt-2 font-bold">
+                      {product.stock > 0 &&
+                        product.stock <= 5 && (
+                          <span className="absolute right-3 top-3 rounded-full bg-red-500/90 px-2 py-1 text-[10px] font-black text-white">
+                            ÚLTIMOS
+                          </span>
+                        )}
+
+                    </div>
+
+                    <div className="p-4">
+
+                      <h3 className="line-clamp-2 min-h-12 font-black">
                         {product.name}
                       </h3>
 
@@ -445,34 +608,38 @@ export default function Home() {
                         </p>
                       )}
 
-                      {product.promotional_price !== null && (
-                        <p className="mt-2 text-xs text-gray-500 line-through">
-                          {formatPrice(product.price)}
-                        </p>
-                      )}
+                      <div className="mt-3">
 
-                      <p className="text-lg font-black text-yellow-400">
-                        {formatPrice(salePrice)}
-                      </p>
+                        {hasDiscount && (
+                          <p className="text-xs text-gray-500 line-through">
+                            {formatPrice(product.price)}
+                          </p>
+                        )}
+
+                        <p className="text-xl font-black text-yellow-400">
+                          {formatPrice(salePrice)}
+                        </p>
+
+                      </div>
 
                       {product.stock <= 0 ? (
 
                         <button
                           disabled
-                          className="mt-3 w-full rounded-xl bg-gray-800 px-3 py-3 text-sm font-bold text-gray-500"
+                          className="mt-4 w-full rounded-2xl bg-gray-800 px-3 py-3 text-sm font-black text-gray-500"
                         >
                           ESGOTADO
                         </button>
 
                       ) : cartItem ? (
 
-                        <div className="mt-3 flex items-center justify-between rounded-xl border border-yellow-500/30 bg-black p-1">
+                        <div className="mt-4 flex items-center justify-between rounded-2xl border border-yellow-500/30 bg-black p-1">
 
                           <button
                             onClick={() =>
                               decreaseItem(product.id)
                             }
-                            className="h-10 w-10 rounded-lg bg-[#222] text-xl font-bold"
+                            className="h-10 w-10 rounded-xl bg-[#202020] text-xl font-black"
                           >
                             −
                           </button>
@@ -489,7 +656,7 @@ export default function Home() {
                               cartItem.quantity >=
                               product.stock
                             }
-                            className="h-10 w-10 rounded-lg bg-yellow-400 text-xl font-black text-black disabled:opacity-40"
+                            className="h-10 w-10 rounded-xl bg-yellow-400 text-xl font-black text-black disabled:opacity-40"
                           >
                             +
                           </button>
@@ -502,7 +669,7 @@ export default function Home() {
                           onClick={() =>
                             addToCart(product)
                           }
-                          className="mt-3 w-full rounded-xl bg-yellow-400 px-3 py-3 text-sm font-black text-black"
+                          className="mt-4 w-full rounded-2xl bg-yellow-400 px-3 py-3 text-sm font-black text-black"
                         >
                           + ADICIONAR
                         </button>
@@ -516,49 +683,93 @@ export default function Home() {
               })}
 
             </div>
+
           )}
 
         </section>
 
-        {/* AVISO */}
-        <section className="px-4 py-8 text-center text-xs text-gray-600">
-          🔞 Venda proibida para menores de 18 anos.
-          <br />
-          Beba com moderação.
+        {/* BENEFÍCIOS */}
+        <section className="grid grid-cols-3 gap-2 px-4 pt-8 text-center">
+
+          <div className="rounded-2xl bg-[#111] p-4">
+            <div className="text-2xl">🚚</div>
+            <p className="mt-2 text-xs font-bold">
+              Entrega rápida
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#111] p-4">
+            <div className="text-2xl">❄️</div>
+            <p className="mt-2 text-xs font-bold">
+              Bebida gelada
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-[#111] p-4">
+            <div className="text-2xl">🔒</div>
+            <p className="mt-2 text-xs font-bold">
+              Compra segura
+            </p>
+          </div>
+
         </section>
+
+                {/* RODAPÉ */}
+        <footer className="px-4 py-10 text-center">
+
+          <p className="font-black text-yellow-400">
+            ANDINHO DO COMBO
+          </p>
+
+          <p className="mt-2 text-xs text-gray-600">
+            Bebidas • Combos • Delivery
+          </p>
+
+          <p className="mt-4 text-xs text-gray-600">
+            🔞 Venda proibida para menores de 18 anos.
+            <br />
+            Beba com moderação.
+          </p>
+
+        </footer>
 
       </div>
 
       {/* CARRINHO FIXO */}
-      <div className="fixed bottom-4 left-0 right-0 z-50 px-4">
+      {totalItems > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-yellow-500/10 bg-black/95 p-4 backdrop-blur">
 
-     <button
-  onClick={() => {
-    window.location.href = "/carrinho";
-  }}
-  className={`mx-auto flex w-full max-w-md items-center justify-between rounded-2xl px-5 py-4 font-black shadow-2xl ${
-    totalItems > 0
-      ? "bg-yellow-400 text-black"
-      : "bg-[#1b1b1b] text-gray-500"
-  }`}
->
-          <span>
-            🛒 Carrinho
-            {totalItems > 0 &&
-              ` • ${totalItems} ${
-                totalItems === 1
+          <button
+            onClick={() =>
+              (window.location.href = "/carrinho")
+            }
+            className="mx-auto flex w-full max-w-md items-center justify-between rounded-2xl bg-yellow-400 px-5 py-4 text-black shadow-2xl"
+          >
+
+            <div className="text-left">
+
+              <p className="text-xs font-bold">
+                🛒 {totalItems}{" "}
+                {totalItems === 1
                   ? "item"
-                  : "itens"
-              }`}
-          </span>
+                  : "itens"}
+              </p>
 
-          <span>
-            {formatPrice(cartTotal)}
-          </span>
-        </button>
+              <p className="text-lg font-black">
+                {formatPrice(cartTotal)}
+              </p>
 
-      </div>
+            </div>
+
+            <span className="font-black">
+              VER CARRINHO →
+            </span>
+
+          </button>
+
+        </div>
+      )}
 
     </main>
   );
-    }
+                }
