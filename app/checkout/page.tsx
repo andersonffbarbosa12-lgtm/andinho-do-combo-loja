@@ -787,3 +787,101 @@ export default function CheckoutPage() {
   rows={4}
   className="mt-4 w-full resize-none rounded-xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400"
 />
+        </section>
+
+        {/* RESUMO */}
+        <section className="mt-5 rounded-2xl border border-white/10 bg-[#141414] p-5">
+
+          <h2 className="font-black">
+            Resumo do pedido
+          </h2>
+
+          <div className="mt-4 space-y-3">
+
+            {cart.map((item) => (
+              <div
+                key={item.id}
+                className="flex justify-between gap-4 text-sm"
+              >
+                <span className="text-gray-400">
+                  {item.quantity}x {item.name}
+                </span>
+
+                <span>
+                  {formatPrice(item.price * item.quantity)}
+                </span>
+              </div>
+            ))}
+
+            <div className="border-t border-white/10 pt-4">
+
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+
+              <div className="mt-2 flex justify-between text-sm text-gray-400">
+                <span>Entrega</span>
+
+                <span>
+                  {orderType === "delivery"
+                    ? "A confirmar"
+                    : "Retirada"}
+                </span>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <span className="font-black">
+                  Total parcial
+                </span>
+
+                <span className="text-2xl font-black text-yellow-400">
+                  {formatPrice(total)}
+                </span>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <div className="py-6 text-center text-xs text-gray-600">
+          🔞 Venda proibida para menores de 18 anos.
+          <br />
+          Beba com moderação.
+        </div>
+
+      </div>
+
+      {/* FINALIZAR */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-black/95 p-4">
+
+        <div className="mx-auto max-w-3xl">
+
+          <button
+            onClick={finishOrder}
+            disabled={sending}
+            className="flex w-full items-center justify-between rounded-2xl bg-yellow-400 px-5 py-4 text-black shadow-2xl disabled:opacity-50"
+          >
+            <div className="text-left">
+              <p className="text-xs font-bold">
+                TOTAL PARCIAL
+              </p>
+
+              <p className="text-lg font-black">
+                {formatPrice(total)}
+              </p>
+            </div>
+
+            <span className="font-black">
+              {sending
+                ? "ENVIANDO..."
+                : "FINALIZAR NO WHATSAPP →"}
+            </span>
+          </button>
+
+        </div>
+      </div>
+
+    </main>
+  );
+                }
