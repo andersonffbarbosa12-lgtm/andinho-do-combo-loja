@@ -783,7 +783,7 @@ export default function CheckoutPage() {
   onChange={(e) =>
     setNotes(e.target.value)
   }
-  placeholder="Ex: levar gelo, interfone não funciona..."
+  placeholder="Ex: interfone não funciona..."
   rows={4}
   className="mt-4 w-full resize-none rounded-xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400"
 />
