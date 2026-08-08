@@ -65,6 +65,7 @@ function getCategoryName(product: Product) {
 
 export default function Home() {
   const [category, setCategory] = useState("Ofertas");
+  const [search, setSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -212,14 +213,31 @@ export default function Home() {
     );
   }
 
-  const filteredProducts = products.filter((product) => {
-    if (category === "Ofertas") {
-      return (
-        product.on_sale ||
-        product.promotional_price !== null
-      );
-    }
+const filteredProducts = products.filter((product) => {
+  const searchText = search.toLowerCase().trim();
 
+  const matchesSearch =
+    product.name.toLowerCase().includes(searchText) ||
+    (product.description ?? "")
+      .toLowerCase()
+      .includes(searchText) ||
+    (product.volume ?? "")
+      .toLowerCase()
+      .includes(searchText);
+
+  if (searchText) {
+    return matchesSearch;
+  }
+
+  if (category === "Ofertas") {
+    return (
+      product.on_sale ||
+      product.promotional_price !== null
+    );
+  }
+
+  return getCategoryName(product) === category;
+});
     return getCategoryName(product) === category;
   });
 
@@ -393,6 +411,33 @@ export default function Home() {
 
         </section>
 
+        {/* BUSCA */}
+<section className="px-4 pt-5">
+  <div className="relative">
+    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">
+      🔍
+    </span>
+
+    <input
+      type="text"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Buscar whisky, gin, cerveja..."
+      className="w-full rounded-2xl border border-white/10 bg-[#131313] py-4 pl-12 pr-12 text-sm text-white outline-none transition focus:border-yellow-400"
+    />
+
+    {search && (
+      <button
+        onClick={() => setSearch("")}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+        aria-label="Limpar busca"
+      >
+        ✕
+      </button>
+    )}
+  </div>
+</section>
+        
         {/* CATEGORIAS */}
         <section className="pt-5">
 
