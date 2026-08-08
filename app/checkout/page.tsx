@@ -242,7 +242,6 @@ export default function CheckoutPage() {
           ? Number(changeFor.replace(",", "."))
           : null;
 
-      const { data: order, error: orderError } =
       const orderId = crypto.randomUUID();
 
 const { error: orderError } =
