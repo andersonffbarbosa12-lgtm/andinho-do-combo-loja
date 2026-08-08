@@ -243,35 +243,36 @@ export default function CheckoutPage() {
           : null;
 
       const { data: order, error: orderError } =
-        await supabase
-          .from("orders")
-          .insert({
-            customer_name: name.trim(),
-            customer_phone: phone.trim(),
-            order_type: orderType,
-            address: fullAddress,
-            neighborhood:
-              orderType === "delivery"
-                ? neighborhood.trim()
-                : null,
-            city: "Petrópolis - RJ",
-            cep:
-              orderType === "delivery" &&
-              cep.trim()
-                ? cep.trim()
-                : null,
-            payment_method: paymentMethod,
-            change_for: changeValue,
-            subtotal,
-            delivery_fee: deliveryFee,
-            discount: 0,
-            total,
-            notes: notes.trim() || null,
-            status: "pending",
-            whatsapp_opened: true,
-          })
-          .select("id")
-          .single();
+      const orderId = crypto.randomUUID();
+
+const { error: orderError } =
+  await supabase
+    .from("orders")
+    .insert({
+      id: orderId,
+      customer_name: name.trim(),
+      customer_phone: phone.trim(),
+      order_type: orderType,
+      address: fullAddress,
+      neighborhood:
+        orderType === "delivery"
+          ? neighborhood.trim()
+          : null,
+      city: "Petrópolis - RJ",
+      cep:
+        orderType === "delivery" && cep.trim()
+          ? cep.trim()
+          : null,
+      payment_method: paymentMethod,
+      change_for: changeValue,
+      subtotal,
+      delivery_fee: deliveryFee,
+      discount: 0,
+      total,
+      notes: notes.trim() || null,
+      status: "pending",
+      whatsapp_opened: true,
+    });
 
       if (orderError || !order) {
         console.error(orderError);
