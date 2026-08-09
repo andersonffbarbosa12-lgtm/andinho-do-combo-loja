@@ -1,70 +1,134 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
+
 import crypto from "crypto";
+
+import {
+  getSupabaseAdmin,
+} from "../../../../lib/supabase-admin";
+
+export const runtime = "nodejs";
+
+function safeEqualHex(
+  calculated: string,
+  received: string
+) {
+  try {
+    const a =
+      Buffer.from(
+        calculated,
+        "hex"
+      );
+
+    const b =
+      Buffer.from(
+        received,
+        "hex"
+      );
+
+    if (
+      a.length === 0 ||
+      a.length !== b.length
+    ) {
+      return false;
+    }
+
+    return crypto
+      .timingSafeEqual(
+        a,
+        b
+      );
+  } catch {
+    return false;
+  }
+}
 
 function validateSignature(
   request: NextRequest,
   dataId: string
 ) {
   const secret =
-    process.env.MERCADO_PAGO_WEBHOOK_SECRET?.trim();
+    process.env
+      .MERCADO_PAGO_WEBHOOK_SECRET
+      ?.trim();
 
   if (!secret) {
+    console.error(
+      "MERCADO_PAGO_WEBHOOK_SECRET não configurado."
+    );
+
     return false;
   }
 
   const xSignature =
-    request.headers.get("x-signature");
+    request.headers.get(
+      "x-signature"
+    );
 
   const xRequestId =
-    request.headers.get("x-request-id");
+    request.headers.get(
+      "x-request-id"
+    );
 
-  if (!xSignature) {
+  if (
+    !xSignature ||
+    !xRequestId
+  ) {
     return false;
   }
 
-  const parts = xSignature.split(",");
-
-  let ts = "";
+  let timestamp = "";
   let receivedHash = "";
 
-  for (const rawPart of parts) {
-    const part = rawPart.trim();
-    const separatorIndex = part.indexOf("=");
+  for (
+    const rawPart
+    of xSignature.split(",")
+  ) {
+    const [
+      rawKey,
+      ...rawValue
+    ] =
+      rawPart
+        .trim()
+        .split("=");
 
-    if (separatorIndex === -1) {
-      continue;
+    const key =
+      rawKey?.trim();
+
+    const value =
+      rawValue
+        .join("=")
+        .trim();
+
+    if (
+      key === "ts"
+    ) {
+      timestamp =
+        value;
     }
 
-    const key = part
-      .slice(0, separatorIndex)
-      .trim();
-
-    const value = part
-      .slice(separatorIndex + 1)
-      .trim();
-
-    if (key === "ts") {
-      ts = value;
-    }
-
-    if (key === "v1") {
-      receivedHash = value;
+    if (
+      key === "v1"
+    ) {
+      receivedHash =
+        value;
     }
   }
 
-  if (!ts || !receivedHash) {
+  if (
+    !timestamp ||
+    !receivedHash
+  ) {
     return false;
   }
 
-  /*
-    O Mercado Pago orienta montar o manifesto
-    somente com os valores presentes.
-  */
   let manifest = "";
 
   if (dataId) {
-    manifest += `id:${dataId};`;
+    manifest +=
+      `id:${dataId.toLowerCase()};`;
   }
 
   if (xRequestId) {
@@ -72,39 +136,49 @@ function validateSignature(
       `request-id:${xRequestId};`;
   }
 
-  manifest += `ts:${ts};`;
+  manifest +=
+    `ts:${timestamp};`;
 
-  const calculatedHash = crypto
-    .createHmac("sha256", secret)
-    .update(manifest)
-    .digest("hex");
+  const calculated =
+    crypto
+      .createHmac(
+        "sha256",
+        secret
+      )
+      .update(manifest)
+      .digest("hex");
 
-  try {
-    const calculatedBuffer =
-      Buffer.from(
-        calculatedHash,
-        "utf8"
-      );
+  return safeEqualHex(
+    calculated,
+    receivedHash
+  );
+}
 
-    const receivedBuffer =
-      Buffer.from(
-        receivedHash,
-        "utf8"
-      );
+function mapPaymentStatus(
+  paymentStatus: string
+) {
+  switch (
+    paymentStatus
+  ) {
+    case "approved":
+      return "paid";
 
-    if (
-      calculatedBuffer.length !==
-      receivedBuffer.length
-    ) {
-      return false;
-    }
+    case "pending":
+    case "in_process":
+    case "authorized":
+      return "pending_payment";
 
-    return crypto.timingSafeEqual(
-      calculatedBuffer,
-      receivedBuffer
-    );
-  } catch {
-    return false;
+    case "rejected":
+      return "payment_rejected";
+
+    case "cancelled":
+      return "cancelled";
+
+    case "refunded":
+      return "refunded";
+
+    default:
+      return "pending_payment";
   }
 }
 
@@ -112,80 +186,123 @@ export async function POST(
   request: NextRequest
 ) {
   try {
-    const body = await request.json();
+    let body: any = {};
+
+    try {
+      body =
+        await request.json();
+    } catch {
+      body = {};
+    }
 
     const type =
-      request.nextUrl.searchParams.get("type") ||
+      request.nextUrl
+        .searchParams
+        .get("type") ||
       body.type ||
       body.topic;
 
-    const paymentId =
-      request.nextUrl.searchParams.get("data.id") ||
-      body.data?.id?.toString();
-
-    // Ignora notificações que não sejam de pagamento
+    /*
+      Outros tipos de notificação
+      podem ser ignorados.
+    */
     if (
-      type !== "payment" ||
-      !paymentId
+      type !== "payment"
     ) {
       return NextResponse.json(
-        { received: true },
-        { status: 200 }
+        {
+          received: true,
+          ignored: true,
+        },
+        {
+          status: 200,
+        }
       );
     }
 
-    // Tenta validar a assinatura recebida.
-    const signatureValid =
-      validateSignature(
+    const paymentId =
+      request.nextUrl
+        .searchParams
+        .get("data.id") ||
+      body.data?.id
+        ?.toString();
+
+    if (!paymentId) {
+      return NextResponse.json(
+        {
+          error:
+            "Pagamento não informado.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      !validateSignature(
         request,
         paymentId
+      )
+    ) {
+      console.warn(
+        "Webhook Mercado Pago rejeitado: assinatura inválida."
       );
 
-    if (!signatureValid) {
-      /*
-        Não confiamos no conteúdo do webhook.
-        Em vez de atualizar o pedido diretamente,
-        seguimos para a consulta oficial do pagamento
-        na API do Mercado Pago usando nosso Access Token.
-      */
-      console.warn(
-        "Assinatura do webhook não validou; confirmando pagamento diretamente na API do Mercado Pago."
+      return NextResponse.json(
+        {
+          error:
+            "Invalid signature",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
     const accessToken =
-      process.env.MERCADO_PAGO_ACCESS_TOKEN;
+      process.env
+        .MERCADO_PAGO_ACCESS_TOKEN;
 
     if (!accessToken) {
-      return NextResponse.json(
-        {
-          error:
-            "Mercado Pago não configurado.",
-        },
-        { status: 500 }
+      throw new Error(
+        "MERCADO_PAGO_ACCESS_TOKEN não configurado."
       );
     }
 
-    // Consulta o pagamento diretamente no Mercado Pago
+    /*
+      Mesmo com assinatura válida,
+      buscamos os dados reais
+      diretamente no Mercado Pago.
+    */
     const paymentResponse =
       await fetch(
-        `https://api.mercadopago.com/v1/payments/${paymentId}`,
+        `https://api.mercadopago.com/v1/payments/${encodeURIComponent(
+          paymentId
+        )}`,
         {
-          method: "GET",
-
           headers: {
             Authorization:
               `Bearer ${accessToken}`,
           },
 
-          cache: "no-store",
+          cache:
+            "no-store",
+
+          signal:
+            AbortSignal.timeout(
+              15_000
+            ),
         }
       );
 
     const payment =
-      await paymentResponse.json();
+      await paymentResponse
+        .json();
 
-    if (!paymentResponse.ok) {
+    if (
+      !paymentResponse.ok
+    ) {
       console.error(
         "Erro consultando pagamento:",
         payment
@@ -196,121 +313,76 @@ export async function POST(
           error:
             "Erro consultando pagamento.",
         },
-        { status: 500 }
+        {
+          status: 502,
+        }
       );
     }
 
     const externalReference =
-      payment.external_reference;
-
-    if (!externalReference) {
-      console.error(
-        "Pagamento sem external_reference:",
-        paymentId
-      );
-
-      return NextResponse.json(
-        { received: true },
-        { status: 200 }
-      );
-    }
-
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-    const serviceRole =
-      process.env.SUPABASE_SERVICE_ROLE_KEY;
+      typeof payment
+        .external_reference ===
+      "string"
+        ? payment
+            .external_reference
+            .trim()
+        : "";
 
     if (
-      !supabaseUrl ||
-      !serviceRole
+      !externalReference
     ) {
       return NextResponse.json(
         {
-          error:
-            "Supabase servidor não configurado.",
+          received: true,
+          orderFound: false,
         },
-        { status: 500 }
+        {
+          status: 200,
+        }
       );
     }
 
     const supabase =
-      createClient(
-        supabaseUrl,
-        serviceRole,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-          },
-        }
-      );
+      getSupabaseAdmin();
 
-    let orderStatus =
-      "pending_payment";
-
-    switch (payment.status) {
-      case "approved":
-        orderStatus = "paid";
-        break;
-
-      case "pending":
-      case "in_process":
-      case "authorized":
-        orderStatus =
-          "pending_payment";
-        break;
-
-      case "rejected":
-        orderStatus =
-          "payment_rejected";
-        break;
-
-      case "cancelled":
-        orderStatus =
-          "cancelled";
-        break;
-
-      case "refunded":
-        orderStatus =
-          "refunded";
-        break;
-
-      default:
-        orderStatus =
-          "pending_payment";
-    }
-
-    const { data: order, error } =
+    const {
+      data: order,
+      error: orderError,
+    } =
       await supabase
         .from("orders")
-        .update({
-          status: orderStatus,
-        })
+        .select(`
+          id,
+          total,
+          status,
+          payment_method,
+          mercado_pago_payment_id
+        `)
         .eq(
           "id",
           externalReference
         )
-        .select("id")
         .maybeSingle();
 
-    if (error) {
+    if (orderError) {
       console.error(
-        "Erro atualizando pedido:",
-        error
+        "Erro buscando pedido:",
+        orderError
       );
 
       return NextResponse.json(
         {
           error:
-            "Erro atualizando pedido.",
+            "Erro buscando pedido.",
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
     if (!order) {
-      console.error(
+      console.warn(
         "Pedido não encontrado:",
         externalReference
       );
@@ -320,21 +392,193 @@ export async function POST(
           received: true,
           orderFound: false,
         },
-        { status: 200 }
+        {
+          status: 200,
+        }
+      );
+    }
+
+    /*
+      A mesma cobrança não pode
+      pertencer a outro pedido.
+    */
+    if (
+      order.mercado_pago_payment_id &&
+      order.mercado_pago_payment_id !==
+        String(payment.id)
+    ) {
+      console.error(
+        "Pedido já vinculado a outro pagamento."
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Pagamento incompatível.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    const expectedTotal =
+      Number(
+        Number(
+          order.total
+        ).toFixed(2)
+      );
+
+    const paidAmount =
+      Number(
+        Number(
+          payment.transaction_amount
+        ).toFixed(2)
+      );
+
+    if (
+      !Number.isFinite(
+        paidAmount
+      ) ||
+      Math.abs(
+        expectedTotal -
+        paidAmount
+      ) > 0.01
+    ) {
+      console.error(
+        "Valor do pagamento não corresponde ao pedido.",
+        {
+          expectedTotal,
+          paidAmount,
+          orderId:
+            order.id,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Valor incompatível.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    if (
+      payment.currency_id !==
+      "BRL"
+    ) {
+      console.error(
+        "Moeda inválida no pagamento:",
+        payment.currency_id
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Moeda incompatível.",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
+    const orderStatus =
+      mapPaymentStatus(
+        String(
+          payment.status ?? ""
+        )
+      );
+
+    const updateData: {
+      status: string;
+      mercado_pago_payment_id: string;
+      payment_status_detail:
+        string | null;
+      paid_at?: string;
+      updated_at: string;
+    } = {
+      status:
+        orderStatus,
+
+      mercado_pago_payment_id:
+        String(
+          payment.id
+        ),
+
+      payment_status_detail:
+        payment.status_detail
+          ? String(
+              payment.status_detail
+            )
+          : null,
+
+      updated_at:
+        new Date()
+          .toISOString(),
+    };
+
+    if (
+      payment.status ===
+      "approved"
+    ) {
+      updateData.paid_at =
+        payment.date_approved
+          ? new Date(
+              payment.date_approved
+            ).toISOString()
+          : new Date()
+              .toISOString();
+    }
+
+    const {
+      error:
+        updateError,
+    } =
+      await supabase
+        .from("orders")
+        .update(
+          updateData
+        )
+        .eq(
+          "id",
+          order.id
+        );
+
+    if (updateError) {
+      console.error(
+        "Erro atualizando pedido:",
+        updateError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Erro atualizando pedido.",
+        },
+        {
+          status: 500,
+        }
       );
     }
 
     console.log(
-      `Pagamento ${paymentId}: pedido ${externalReference} atualizado para ${orderStatus}. Assinatura válida: ${signatureValid}`
+      `Pagamento ${payment.id}: pedido ${order.id} → ${orderStatus}`
     );
 
     return NextResponse.json(
       {
         received: true,
         orderFound: true,
-        status: orderStatus,
+        status:
+          orderStatus,
       },
-      { status: 200 }
+      {
+        status: 200,
+      }
     );
   } catch (error) {
     console.error(
@@ -347,7 +591,9 @@ export async function POST(
         error:
           "Webhook error",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
-}
+      }
