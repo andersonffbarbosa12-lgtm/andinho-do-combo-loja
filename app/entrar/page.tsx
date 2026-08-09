@@ -345,5 +345,4 @@ export default function EntrarPage() {
         </p>
       </div>
     </main>
-  );
-      }
+  );  
