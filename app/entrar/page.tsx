@@ -340,9 +340,10 @@ export default function EntrarPage() {
           </div>
         </div>
 
-        <p className="mt-5 text-center text-xs text-gray-600">
+                <p className="mt-5 text-center text-xs text-gray-600">
           🔞 Venda proibida para menores de 18 anos.
         </p>
       </div>
     </main>
-  );  
+  );
+}
