@@ -580,7 +580,7 @@ export async function POST(
         status: 200,
       }
     );
-  } catch (error) {
+    } catch (error) {
     console.error(
       "Erro webhook Mercado Pago:",
       error
@@ -588,12 +588,11 @@ export async function POST(
 
     return NextResponse.json(
       {
-        error:
-          "Webhook error",
+        error: "Webhook error",
       },
       {
         status: 500,
       }
     );
   }
-      }
+}
