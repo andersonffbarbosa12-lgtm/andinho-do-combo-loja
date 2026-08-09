@@ -1,19 +1,49 @@
-import { createClient } from "@supabase/supabase-js";
+import "server-only";
+
+import { createClient } from
+  "@supabase/supabase-js";
 
 export function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (!url || !serviceRole) {
+  const secretKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurada."
+      "NEXT_PUBLIC_SUPABASE_URL não configurada."
     );
   }
 
-  return createClient(url, serviceRole, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  if (!secretKey) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY não configurada."
+    );
+  }
+
+  /*
+    Este cliente possui privilégios elevados.
+
+    NUNCA importe este arquivo em componentes
+    com "use client".
+  */
+  return createClient(
+    url,
+    secretKey,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+
+      global: {
+        headers: {
+          "X-Client-Info":
+            "andinho-do-combo-server",
+        },
+      },
+    }
+  );
 }
