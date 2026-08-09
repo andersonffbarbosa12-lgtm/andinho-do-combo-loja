@@ -139,19 +139,63 @@ function validateSignature(
   manifest +=
     `ts:${timestamp};`;
 
-  const calculated =
-    crypto
-      .createHmac(
-        "sha256",
-        secret
-      )
-      .update(manifest)
-      .digest("hex");
+const calculated =
+  crypto
+    .createHmac(
+      "sha256",
+      secret
+    )
+    .update(manifest)
+    .digest("hex");
 
-  return safeEqualHex(
+const isValid =
+  safeEqualHex(
     calculated,
     receivedHash
   );
+
+/*
+  DIAGNÓSTICO TEMPORÁRIO
+  Não mostra o secret nem os hashes completos.
+*/
+console.log(
+  "MP_WEBHOOK_DIAGNOSTIC",
+  {
+    dataId,
+    hasSecret:
+      Boolean(secret),
+
+    secretLength:
+      secret.length,
+
+    hasXSignature:
+      Boolean(xSignature),
+
+    hasXRequestId:
+      Boolean(xRequestId),
+
+    xRequestId:
+      xRequestId,
+
+    timestamp,
+
+    hasV1:
+      Boolean(receivedHash),
+
+    receivedHashLength:
+      receivedHash.length,
+
+    calculatedHashLength:
+      calculated.length,
+
+    manifest,
+
+    signatureValid:
+      isValid,
+  }
+);
+
+return isValid;
 }
 
 function mapPaymentStatus(
