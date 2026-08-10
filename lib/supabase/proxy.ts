@@ -11,33 +11,19 @@ export async function updateSession(
     request,
   });
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL!;
-
-  const supabaseKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
   const supabase = createServerClient(
-    supabaseUrl,
-    supabaseKey,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
 
-        setAll(
-          cookiesToSet,
-          headers
-        ) {
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(
-            ({ name, value }) => {
-              request.cookies.set(
-                name,
-                value
-              );
-            }
+            ({ name, value }) =>
+              request.cookies.set(name, value)
           );
 
           response = NextResponse.next({
@@ -45,35 +31,82 @@ export async function updateSession(
           });
 
           cookiesToSet.forEach(
-            ({
-              name,
-              value,
-              options,
-            }) => {
+            ({ name, value, options }) =>
               response.cookies.set(
                 name,
                 value,
                 options
-              );
-            }
-          );
-
-          Object.entries(
-            headers
-          ).forEach(
-            ([key, value]) => {
-              response.headers.set(
-                key,
-                value
-              );
-            }
+              )
           );
         },
       },
     }
   );
 
-  await supabase.auth.getClaims();
+  const { data } =
+    await supabase.auth.getClaims();
+
+  const isLoggedIn = Boolean(
+    data?.claims?.sub
+  );
+
+  const pathname =
+    request.nextUrl.pathname;
+
+  const publicRoutes = [
+    "/entrar",
+    "/cadastro",
+  ];
+
+  const isPublicRoute =
+    publicRoutes.some(
+      (route) =>
+        pathname === route ||
+        pathname.startsWith(
+          `${route}/`
+        )
+    );
+
+  const isAdmin =
+    pathname === "/admin" ||
+    pathname.startsWith(
+      "/admin/"
+    );
+
+  const isApi =
+    pathname.startsWith("/api/");
+
+  const isPaymentCallback =
+    pathname.startsWith(
+      "/pagamento/"
+    );
+
+  if (
+    !isLoggedIn &&
+    !isPublicRoute &&
+    !isAdmin &&
+    !isApi &&
+    !isPaymentCallback
+  ) {
+    const url =
+      request.nextUrl.clone();
+
+    url.pathname = "/entrar";
+
+    return NextResponse.redirect(url);
+  }
+
+  if (
+    isLoggedIn &&
+    isPublicRoute
+  ) {
+    const url =
+      request.nextUrl.clone();
+
+    url.pathname = "/";
+
+    return NextResponse.redirect(url);
+  }
 
   return response;
             }
