@@ -1,28 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-type Product = {
-  id: string;
-  name: string;
-  description: string | null;
-  volume: string | null;
-  image_url: string | null;
-  price: number;
-  promotional_price: number | null;
-  stock: number;
-  featured: boolean;
-  on_sale: boolean;
-  category_id: string | null;
-  categories:
-    | {
-        name: string;
-      }
-    | {
-        name: string;
-      }[]
-    | null;
-};
+import { useRouter } from "next/navigation";
 
 type CartItem = {
   id: string;
@@ -34,27 +13,19 @@ type CartItem = {
   stock: number;
 };
 
-type StoreCategory = {
-  id: string;
-  name: string;
-  icon: string | null;
-};
+type OrderType = "delivery" | "pickup";
+
+type PaymentMethod =
+  | "pix"
+  | "cash"
+  | "card_debit"
+  | "card_credit";
 
 function formatPrice(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
   }).format(value);
-}
-
-function getCategoryName(product: Product) {
-  if (!product.categories) return "";
-
-  if (Array.isArray(product.categories)) {
-    return product.categories[0]?.name ?? "";
-  }
-
-  return product.categories.name;
 }
 
 
@@ -69,7 +40,6 @@ function getBrasiliaMinutes() {
   const hour = Number(
     parts.find((part) => part.type === "hour")?.value ?? 0
   );
-
   const minute = Number(
     parts.find((part) => part.type === "minute")?.value ?? 0
   );
@@ -77,73 +47,45 @@ function getBrasiliaMinutes() {
   return hour * 60 + minute;
 }
 
-export default function Home() {
-  const [category, setCategory] = useState("Todos");
-  const [search, setSearch] = useState("");
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<StoreCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function CheckoutPage() {
+  const router = useRouter();
+
+  const currentMinutes = getBrasiliaMinutes();
+  const isOpen =
+    currentMinutes >= 14 * 60 ||
+    currentMinutes < 4 * 60;
 
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartLoaded, setCartLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [payingOnline, setPayingOnline] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const [orderType, setOrderType] =
+    useState<OrderType>("delivery");
 
-    async function loadCatalog(showLoading = true) {
-      if (showLoading) {
-        setLoading(true);
-      }
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>("pix");
 
-      try {
-        const response = await fetch("/api/store/catalog", {
-          method: "GET",
-          cache: "no-store",
-        });
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
 
-        const data = await response.json();
+  const [address, setAddress] = useState("");
+  const [number, setNumber] = useState("");
+  const [complement, setComplement] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [cep, setCep] = useState("");
 
-        if (!response.ok) {
-          throw new Error(
-            data?.error || "Não foi possível carregar o catálogo."
-          );
-        }
+  const [changeFor, setChangeFor] = useState("");
+  const [notes, setNotes] = useState("");
 
-        if (cancelled) return;
+  const [deliveryFee, setDeliveryFee] = useState(0);
 
-        setProducts((data.products as Product[]) ?? []);
-        setCategories((data.categories as StoreCategory[]) ?? []);
-      } catch (error) {
-        console.error("Erro ao carregar catálogo:", error);
-
-        if (!cancelled) {
-          setProducts([]);
-          setCategories([]);
-        }
-      } finally {
-        if (!cancelled && showLoading) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadCatalog();
-
-    function refreshCatalog() {
-      if (document.visibilityState === "visible") {
-        loadCatalog(false);
-      }
-    }
-
-    window.addEventListener("focus", refreshCatalog);
-    document.addEventListener("visibilitychange", refreshCatalog);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", refreshCatalog);
-      document.removeEventListener("visibilitychange", refreshCatalog);
-    };
-  }, []);
+  const deliveryAreas = [
+    { name: "Quitandinha", fee: 0 },
+    { name: "Independência", fee: 8 },
+    { name: "Centro", fee: 10 },
+    { name: "Bingen", fee: 15 },
+  ];
 
   useEffect(() => {
     const savedCart = localStorage.getItem("andinho-cart");
@@ -156,140 +98,10 @@ export default function Home() {
       }
     }
 
-    setCartLoaded(true);
+    setLoaded(true);
   }, []);
 
-  useEffect(() => {
-    if (!cartLoaded) return;
-
-    localStorage.setItem(
-      "andinho-cart",
-      JSON.stringify(cart)
-    );
-  }, [cart, cartLoaded]);
-
-  function getProductPrice(product: Product) {
-    return product.promotional_price ?? product.price;
-  }
-
-  function addToCart(product: Product) {
-    const price = getProductPrice(product);
-
-    setCart((currentCart) => {
-      const existing = currentCart.find(
-        (item) => item.id === product.id
-      );
-
-      if (existing) {
-        if (existing.quantity >= product.stock) {
-          return currentCart;
-        }
-
-        return currentCart.map((item) =>
-          item.id === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-              }
-            : item
-        );
-      }
-
-      if (product.stock <= 0) {
-        return currentCart;
-      }
-
-      return [
-        ...currentCart,
-        {
-          id: product.id,
-          name: product.name,
-          volume: product.volume,
-          image_url: product.image_url,
-          price,
-          quantity: 1,
-          stock: product.stock,
-        },
-      ];
-    });
-  }
-
-  function increaseItem(productId: string) {
-    setCart((currentCart) =>
-      currentCart.map((item) => {
-        if (item.id !== productId) {
-          return item;
-        }
-
-        if (item.quantity >= item.stock) {
-          return item;
-        }
-
-        return {
-          ...item,
-          quantity: item.quantity + 1,
-        };
-      })
-    );
-  }
-
-  function decreaseItem(productId: string) {
-    setCart((currentCart) =>
-      currentCart
-        .map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                quantity: item.quantity - 1,
-              }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
-  }
-
-const filteredProducts = products.filter((product) => {
-  const searchText = search.toLowerCase().trim();
-
-  const matchesSearch =
-    product.name.toLowerCase().includes(searchText) ||
-    (product.description ?? "")
-      .toLowerCase()
-      .includes(searchText) ||
-    (product.volume ?? "")
-      .toLowerCase()
-      .includes(searchText);
-
-  if (searchText) {
-    return matchesSearch;
-  }
-
-  if (category === "Todos") {
-    return true;
-  }
-
-  if (category === "Ofertas") {
-    return (
-      product.on_sale ||
-      product.promotional_price !== null
-    );
-  }
-
-  return getCategoryName(product) === category;
-});
-
-  const featuredProducts = products.filter(
-    (product) => product.featured
-  );
-
-  const totalItems = useMemo(() => {
-    return cart.reduce(
-      (total, item) => total + item.quantity,
-      0
-    );
-  }, [cart]);
-
-  const cartTotal = useMemo(() => {
+  const subtotal = useMemo(() => {
     return cart.reduce(
       (total, item) =>
         total + item.price * item.quantity,
@@ -297,639 +109,627 @@ const filteredProducts = products.filter((product) => {
     );
   }, [cart]);
 
-  const visibleCategories = [
-    { id: "all", icon: "🛍️", name: "Todos" },
-    { id: "offers", icon: "🔥", name: "Ofertas" },
-    ...categories
-      .filter(
-        (item) =>
-          item.name !== "Todos" &&
-          item.name !== "Ofertas"
-      )
-      .map((item) => ({
-        id: item.id,
-        icon: item.icon || "📦",
-        name: item.name,
-      })),
-  ];
+  const totalItems = useMemo(() => {
+    return cart.reduce(
+      (total, item) =>
+        total + item.quantity,
+      0
+    );
+  }, [cart]);
 
-  const currentMinutes = getBrasiliaMinutes();
+  const total = useMemo(() => {
+    return subtotal + deliveryFee;
+  }, [subtotal, deliveryFee]);
 
-  const isOpen =
-    currentMinutes >= 14 * 60 ||
-    currentMinutes < 4 * 60;
+  function getPaymentLabel() {
+    switch (paymentMethod) {
+      case "pix":
+        return "Pix";
 
-  return (
-    <main className="min-h-screen bg-[#070707] pb-32 text-white">
+      case "cash":
+        return "Dinheiro";
 
-      {/* TOPO */}
-      <header className="sticky top-0 z-50 border-b border-yellow-500/10 bg-black/95 backdrop-blur">
+      case "card_debit":
+        return "Cartão de débito na entrega";
 
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      case "card_credit":
+        return "Cartão de crédito na entrega";
 
-          <div className="flex items-center gap-3">
+      default:
+        return "";
+    }
+  }
 
-            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-yellow-400/70 bg-black shadow-[0_0_18px_rgba(250,204,21,0.20)]">
-              <img
-                src="/logo-andinho.png"
-                alt="Logo Andinho do Combo"
-                className="h-full w-full object-cover"
-              />
-            </div>
+  function validateForm() {
+    if (!name.trim()) {
+      alert("Digite seu nome.");
+      return false;
+    }
 
-            <div>
-              <h1 className="text-lg font-black tracking-wide text-yellow-400">
-                ANDINHO DO COMBO
-              </h1>
+    if (!phone.trim()) {
+      alert("Digite seu telefone.");
+      return false;
+    }
 
-              <p className="text-[11px] text-gray-500">
-                Bebidas • Combos • Delivery
-              </p>
-            </div>
+    if (orderType === "delivery") {
+      if (!address.trim()) {
+        alert("Digite o endereço.");
+        return false;
+      }
 
+      if (!number.trim()) {
+        alert("Digite o número do endereço.");
+        return false;
+      }
+
+      if (!neighborhood.trim()) {
+        alert("Digite o bairro.");
+        return false;
+      }
+    }
+
+    if (
+      paymentMethod === "cash" &&
+      changeFor &&
+      Number(changeFor.replace(",", ".")) < total
+    ) {
+      alert(
+        "O valor informado para troco precisa ser maior que o total do pedido."
+      );
+
+      return false;
+    }
+
+    return true;
+  }
+
+  function buildWhatsAppMessage(orderId: string) {
+    const productLines = cart
+      .map((item) => {
+        return `${item.quantity}x ${item.name}${
+          item.volume
+            ? ` (${item.volume})`
+            : ""
+        } — ${formatPrice(
+          item.price * item.quantity
+        )}`;
+      })
+      .join("\n");
+
+    let deliveryInfo = "";
+
+    if (orderType === "delivery") {
+      deliveryInfo =
+        `🚚 Entrega\n` +
+        `${address}, ${number}\n` +
+        `${complement ? `${complement}\n` : ""}` +
+        `Bairro: ${neighborhood}\n` +
+        `${cep ? `CEP: ${cep}\n` : ""}`;
+    } else {
+      deliveryInfo = "🏪 Retirada no local";
+    }
+
+    let paymentInfo =
+      `💳 Pagamento: ${getPaymentLabel()}`;
+
+    if (
+      paymentMethod === "cash" &&
+      changeFor
+    ) {
+      paymentInfo +=
+        `\n💵 Troco para: ${formatPrice(
+          Number(changeFor.replace(",", "."))
+        )}`;
+    }
+
+    return encodeURIComponent(
+      `Olá, Andinho do Combo! Quero fazer um pedido.\n\n` +
+        `🧾 Pedido: ${orderId.slice(0, 8).toUpperCase()}\n\n` +
+        `${productLines}\n\n` +
+        `Subtotal: ${formatPrice(subtotal)}\n` +
+        `Entrega: ${
+          orderType === "pickup"
+            ? "Retirada"
+            : deliveryAreas.some(
+                (area) =>
+                  area.name.toLowerCase() ===
+                  neighborhood.trim().toLowerCase()
+              )
+              ? deliveryFee === 0
+                ? "Grátis"
+                : formatPrice(deliveryFee)
+              : "A confirmar"
+        }\n` +
+        `Total: ${formatPrice(total)}\n\n` +
+        `👤 Nome: ${name}\n` +
+        `📱 Telefone: ${phone}\n\n` +
+        `${deliveryInfo}\n\n` +
+        `${paymentInfo}\n` +
+        `${
+          notes
+            ? `\n📝 Observação: ${notes}\n`
+            : ""
+        }`
+    );
+  }
+
+  async function payOnline() {
+    if (!isOpen) {
+      alert("A loja está fechada no momento. Abrimos às 14:00.");
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert("Seu carrinho está vazio.");
+      return;
+    }
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setPayingOnline(true);
+
+    try {
+      const response = await fetch(
+        "/api/mercadopago/create-preference",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            items: cart.map((item) => ({
+              id: item.id,
+              quantity: item.quantity,
+            })),
+            orderType,
+            neighborhood,
+            name,
+            phone,
+            address,
+            number,
+            complement,
+            cep,
+            notes,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error(data);
+        alert(
+          data.error ||
+            "Não foi possível gerar o pagamento."
+        );
+        setPayingOnline(false);
+        return;
+      }
+
+      if (!data.initPoint) {
+        alert("Não foi possível abrir o Mercado Pago.");
+        setPayingOnline(false);
+        return;
+      }
+
+      window.location.href = data.initPoint;
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao conectar com o Mercado Pago.");
+      setPayingOnline(false);
+    }
+  }
+
+  async function finishOrder() {
+    if (!isOpen) {
+      alert("A loja está fechada no momento. Abrimos às 14:00.");
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert("Seu carrinho está vazio.");
+      return;
+    }
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      const response = await fetch("/api/orders/whatsapp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: cart.map((item) => ({
+            id: item.id,
+            quantity: item.quantity,
+          })),
+          orderType,
+          paymentMethod,
+          neighborhood,
+          name,
+          phone,
+          address,
+          number,
+          complement,
+          cep,
+          changeFor,
+          notes,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error(data);
+
+        alert(
+          data.error ||
+            "Não foi possível criar o pedido. Tente novamente."
+        );
+
+        setSending(false);
+        return;
+      }
+
+      if (!data.orderId) {
+        alert("O pedido foi criado sem identificação. Tente novamente.");
+        setSending(false);
+        return;
+      }
+
+      const message =
+        buildWhatsAppMessage(String(data.orderId));
+
+      const whatsappNumber = "5524992359332";
+      const whatsappUrl =
+        `https://wa.me/${whatsappNumber}?text=${message}`;
+
+      localStorage.removeItem("andinho-cart");
+
+      window.location.href = whatsappUrl;
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        "Ocorreu um erro ao finalizar o pedido."
+      );
+
+      setSending(false);
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#080808] text-white">
+        Carregando checkout...
+      </main>
+    );
+  }
+
+  if (cart.length === 0) {
+    return (
+      <main className="min-h-screen bg-[#080808] px-4 py-10 text-white">
+
+        <div className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-[#111] p-8 text-center">
+
+          <div className="text-6xl">
+            🛒
           </div>
 
+          <h1 className="mt-4 text-2xl font-black">
+            Carrinho vazio
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Adicione produtos antes de finalizar.
+          </p>
+
           <button
-            onClick={() =>
-              (window.location.href = "/carrinho")
-            }
-            className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[#151515]"
+            onClick={() => router.push("/")}
+            className="mt-6 w-full rounded-2xl bg-yellow-400 px-5 py-4 font-black text-black"
           >
-            🛒
-
-            {totalItems > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-yellow-400 px-1 text-xs font-black text-black">
-                {totalItems}
-              </span>
-            )}
-
+            VOLTAR PARA A LOJA
           </button>
 
         </div>
 
-      </header>
+      </main>
+    );
+  }
 
-      <div className="mx-auto max-w-6xl">
-        {/* BANNER PRINCIPAL */}
-        <section className="px-4 pt-4">
+  return (
+    <main className="min-h-screen bg-[#070707] pb-40 text-white">
+      <header className="sticky top-0 z-50 border-b border-yellow-500/10 bg-black/95 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <button
-            onClick={() => setCategory("Ofertas")}
-            className="block w-full overflow-hidden rounded-2xl border border-yellow-500/20 bg-black shadow-2xl"
+            onClick={() => router.push("/carrinho")}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[#151515] text-xl"
           >
-            <img
-              src="/banner-andinho.png"
-              alt="Andinho do Combo - Bebidas e Delivery"
-              className="h-auto w-full object-cover"
-            />
+            ←
           </button>
-        </section>
 
-        {/* STATUS DA LOJA */}
-        <section className="px-4 pt-4">
-
-          <div className="relative overflow-hidden rounded-[28px] border border-yellow-500/20 bg-gradient-to-br from-[#181818] via-[#101010] to-black p-6 shadow-2xl">
-
-            <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-yellow-400/10 blur-3xl" />
-
-            <div className="relative">
-
-              <span className="inline-flex items-center gap-2 rounded-full border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-[11px] font-bold text-yellow-300">
-                ⚡ DELIVERY RÁPIDO
-              </span>
-
-              <h2 className="mt-5 text-4xl font-black leading-none">
-                Sua bebida,
-                <br />
-                <span className="text-yellow-400">
-                  seu combo.
-                </span>
-              </h2>
-
-              <p className="mt-3 max-w-sm text-sm leading-6 text-gray-400">
-                Bebidas geladas, combos e praticidade
-                até 04:00.
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2 text-xs">
-
-                <span className="rounded-full bg-white/5 px-3 py-2 text-gray-300">
-                  🚚 Delivery
-                </span>
-
-                <span className="rounded-full bg-white/5 px-3 py-2 text-gray-300">
-                  💠 Pix
-                </span>
-
-                <span className="rounded-full bg-white/5 px-3 py-2 text-gray-300">
-                  💳 Cartão no local
-                </span>
-
-              </div>
-
-              <button
-                onClick={() => setCategory("Ofertas")}
-                className="mt-6 rounded-2xl bg-yellow-400 px-6 py-4 font-black text-black shadow-lg"
-              >
-                VER OFERTAS 🔥
-              </button>
-
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 overflow-hidden rounded-full border border-yellow-400/40 bg-black">
+              <img src="/logo-andinho.png" alt="Andinho do Combo" className="h-full w-full object-cover" />
             </div>
-
+            <div>
+              <h1 className="text-sm font-black tracking-wide text-yellow-400">FINALIZAR PEDIDO</h1>
+              <p className="text-[11px] text-gray-500">
+                {totalItems} {totalItems === 1 ? "item" : "itens"}
+              </p>
+            </div>
           </div>
 
+          <div className="w-11" />
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-3xl px-4">
+        {!isOpen && (
+          <div className="mt-5 rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+            <p className="font-black text-red-400">🔴 Loja fechada no momento</p>
+            <p className="mt-1 text-sm text-gray-400">
+              Você pode revisar o pedido, mas a finalização será liberada às 14:00.
+            </p>
+          </div>
+        )}
+
+        <section className="mt-5">
+          <div className="mb-3">
+            <p className="text-xs font-bold text-yellow-400">ENTREGA</p>
+            <h2 className="text-xl font-black">Como você quer receber?</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              ["delivery", "🚚", "Entrega", "Receber no endereço"],
+              ["pickup", "🏪", "Retirada", "Retirar no local"],
+            ].map(([value, icon, title, subtitle]) => (
+              <button
+                key={value}
+                onClick={() => setOrderType(value as OrderType)}
+                className={`rounded-3xl border p-4 text-left transition ${
+                  orderType === value
+                    ? "border-yellow-400 bg-yellow-400 text-black"
+                    : "border-white/10 bg-[#131313]"
+                }`}
+              >
+                <div className="text-2xl">{icon}</div>
+                <p className="mt-3 font-black">{title}</p>
+                <p className={`mt-1 text-xs ${orderType === value ? "text-black/60" : "text-gray-500"}`}>
+                  {subtitle}
+                </p>
+              </button>
+            ))}
+          </div>
         </section>
 
-        {/* STATUS DA LOJA */}
-        <section className="px-4 pt-4">
+        <section className="mt-5 rounded-3xl border border-white/10 bg-[#131313] p-5">
+          <p className="text-xs font-bold text-yellow-400">CLIENTE</p>
+          <h2 className="mt-1 text-xl font-black">Seus dados</h2>
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-2 block text-xs font-bold text-gray-400">NOME *</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome"
+                className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-bold text-gray-400">TELEFONE *</label>
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(24) 99999-9999" inputMode="tel"
+                className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+            </div>
+          </div>
+        </section>
 
-          <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#111] px-4 py-3">
+        {orderType === "delivery" && (
+          <section className="mt-5 rounded-3xl border border-white/10 bg-[#131313] p-5">
+            <p className="text-xs font-bold text-yellow-400">LOCALIZAÇÃO</p>
+            <h2 className="mt-1 text-xl font-black">Endereço de entrega</h2>
 
-            <div className="flex items-center gap-3">
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="mb-2 block text-xs font-bold text-gray-400">RUA / ENDEREÇO *</label>
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua..."
+                  className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+              </div>
 
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-green-500/10">
-                🕒
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-gray-400">NÚMERO *</label>
+                  <input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="123"
+                    className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-gray-400">COMPLEMENTO</label>
+                  <input value={complement} onChange={(e) => setComplement(e.target.value)} placeholder="Casa, apto..."
+                    className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+                </div>
               </div>
 
               <div>
-                <p className="text-sm font-bold">
-                  Atendimento
-                </p>
-
-                <p className="text-xs text-gray-500">
-                  {isOpen
-                    ? "Atendimento até 04:00"
-                    : "Abrimos às 14:00"}
-                </p>
+                <label className="mb-2 block text-xs font-bold text-gray-400">BAIRRO *</label>
+                <select
+                  value={neighborhood}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setNeighborhood(value);
+                    const area = deliveryAreas.find((item) => item.name === value);
+                    setDeliveryFee(area ? area.fee : 0);
+                  }}
+                  className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 text-white outline-none focus:border-yellow-400"
+                >
+                  <option value="">Selecione seu bairro</option>
+                  {deliveryAreas.map((area) => (
+                    <option key={area.name} value={area.name}>
+                      {area.name} — {area.fee === 0 ? "Entrega grátis" : formatPrice(area.fee)}
+                    </option>
+                  ))}
+                </select>
               </div>
 
+              <div>
+                <label className="mb-2 block text-xs font-bold text-gray-400">CEP</label>
+                <input value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" inputMode="numeric"
+                  className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+              </div>
             </div>
+          </section>
+        )}
 
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-bold ${
-                isOpen
-                  ? "bg-green-500/10 text-green-400"
-                  : "bg-red-500/10 text-red-400"
-              }`}
-            >
-              {isOpen
-                ? "🟢 ABERTO AGORA"
-                : "🔴 FECHADO"}
-            </span>
+        <section className="mt-5 rounded-3xl border border-white/10 bg-[#131313] p-5">
+          <p className="text-xs font-bold text-yellow-400">PAGAMENTO</p>
+          <h2 className="mt-1 text-xl font-black">Forma de pagamento</h2>
 
-          </div>
-
-        </section>
-{!isOpen && (
-  <section className="px-4 pt-4">
-    <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
-      <div className="flex items-start gap-3">
-        <div className="text-2xl">🔴</div>
-
-        <div>
-          <p className="font-black text-red-400">
-            Loja fechada no momento
-          </p>
-
-          <p className="mt-1 text-sm text-gray-400">
-            Abrimos às 14:00. Você pode montar seu carrinho normalmente,
-            mas os pedidos só poderão ser finalizados quando a loja abrir.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-)}
-        {/* CATEGORIAS */}
-        <section className="pt-5">
-
-          <div className="mb-3 flex items-center justify-between px-4">
-
-            <div>
-              <p className="text-xs font-bold text-yellow-400">
-                ESCOLHA RÁPIDO
-              </p>
-
-              <h2 className="text-xl font-black">
-                Categorias
-              </h2>
-            </div>
-
-          </div>
-
-          <div className="flex gap-3 overflow-x-auto px-4 pb-2">
-
-            {visibleCategories.map((item) => (
+          <div className="mt-5 grid gap-2">
+            {[
+              ["pix", "💠", "Pix"],
+              ["cash", "💵", "Dinheiro"],
+              ["card_debit", "💳", "Débito na maquininha"],
+              ["card_credit", "💳", "Crédito na maquininha"],
+            ].map(([value, icon, label]) => (
               <button
-                key={item.id}
-                onClick={() => setCategory(item.name)}
-                className={`min-w-[88px] rounded-2xl border px-3 py-4 transition ${
-                  category === item.name
+                key={value}
+                onClick={() => setPaymentMethod(value as PaymentMethod)}
+                className={`flex w-full items-center justify-between rounded-2xl border p-4 ${
+                  paymentMethod === value
                     ? "border-yellow-400 bg-yellow-400 text-black"
-                    : "border-white/10 bg-[#131313] text-white"
+                    : "border-white/10 bg-black"
                 }`}
               >
-
-                <div className="text-2xl">
-                  {item.icon}
-                </div>
-
-                <div className="mt-2 text-xs font-black">
-                  {item.name}
-                </div>
-
+                <span className="font-bold">{icon} {label}</span>
+                <span>{paymentMethod === value ? "✓" : ""}</span>
               </button>
             ))}
-
           </div>
 
+          {paymentMethod === "cash" && (
+            <div className="mt-4">
+              <label className="mb-2 block text-xs font-bold text-gray-400">TROCO PARA QUANTO?</label>
+              <input value={changeFor} onChange={(e) => setChangeFor(e.target.value)} placeholder="Ex: 200" inputMode="decimal"
+                className="w-full rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+            </div>
+          )}
         </section>
 
-        {/* BUSCA */}
-<section className="px-4 pt-5">
-  <div className="relative">
-    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">
-      🔍
-    </span>
+        <section className="mt-5 rounded-3xl border border-white/10 bg-[#131313] p-5">
+          <p className="text-xs font-bold text-yellow-400">OBSERVAÇÃO</p>
+          <h2 className="mt-1 text-xl font-black">Algum detalhe do pedido?</h2>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="Ex: interfone não funciona..." rows={4}
+            className="mt-4 w-full resize-none rounded-2xl border border-white/10 bg-black px-4 py-4 outline-none focus:border-yellow-400" />
+        </section>
 
-    <input
-      type="text"
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-      placeholder="Buscar whisky, gin, cerveja..."
-      className="w-full rounded-2xl border border-white/10 bg-[#131313] py-4 pl-12 pr-12 text-sm text-white outline-none transition focus:border-yellow-400"
-    />
-
-    {search && (
-      <button
-        onClick={() => setSearch("")}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-        aria-label="Limpar busca"
-      >
-        ✕
-      </button>
-    )}
-  </div>
-</section>
-        
-        {/* DESTAQUES */}
-{featuredProducts.length > 0 && !search.trim() && (
-  <section className="px-4 pt-7">
-
-    <div className="mb-4 flex items-end justify-between">
-
-      <div>
-        <p className="text-xs font-bold text-yellow-400">
-          SELEÇÃO ESPECIAL
-        </p>
-
-        <h2 className="text-2xl font-black">
-          Destaques
-        </h2>
-      </div>
-
-      <span className="text-xs text-gray-500">
-        Mais procurados
-      </span>
-
-    </div>
-
-    <div className="flex gap-3 overflow-x-auto pb-2">
-
-      {featuredProducts.map((product) => {
-        const price =
-          product.promotional_price ??
-          product.price;
-
-        return (
-          <article
-            key={product.id}
-            className="min-w-[220px] overflow-hidden rounded-3xl border border-yellow-500/20 bg-[#131313]"
-          >
-
-            <div className="flex aspect-square items-center justify-center bg-[#0b0b0b]">
-
-              {product.image_url ? (
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="h-full w-full object-contain p-4"
-                />
-              ) : (
-                <span className="text-7xl">
-                  🥃
-                </span>
-              )}
-
+        <section className="mt-5 overflow-hidden rounded-3xl border border-yellow-500/20 bg-gradient-to-br from-[#171717] to-[#0d0d0d] p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-yellow-400">RESUMO</p>
+              <h2 className="mt-1 text-xl font-black">Seu pedido</h2>
             </div>
-
-            <div className="p-4">
-
-              <span className="rounded-full bg-yellow-400 px-2 py-1 text-[10px] font-black text-black">
-                DESTAQUE
-              </span>
-
-              <h3 className="mt-3 font-black">
-                {product.name}
-              </h3>
-
-              {product.volume && (
-                <p className="mt-1 text-xs text-gray-500">
-                  {product.volume}
-                </p>
-              )}
-
-              <p className="mt-3 text-xl font-black text-yellow-400">
-                {formatPrice(price)}
-              </p>
-
-            </div>
-
-          </article>
-        );
-      })}
-
-    </div>
-
-  </section>
-)}
-        
-        {/* PRODUTOS */}
-        <section className="px-4 pt-8">
-
-          <div className="mb-4">
-
-            <p className="text-xs font-bold text-yellow-400">
-              ANDINHO DO COMBO
-            </p>
-
-            <h2 className="text-2xl font-black">
-              {category}
-            </h2>
-
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-400/10">🧾</div>
           </div>
 
-          {loading ? (
+          <div className="mt-5 space-y-3">
+            {cart.map((item) => (
+              <div key={item.id} className="flex justify-between gap-4 text-sm">
+                <span className="text-gray-400">{item.quantity}x {item.name}</span>
+                <span className="font-bold">{formatPrice(item.price * item.quantity)}</span>
+              </div>
+            ))}
 
-            <div className="rounded-3xl bg-[#111] p-10 text-center">
-              <p className="text-gray-400">
-                Carregando produtos...
-              </p>
-            </div>
-
-          ) : filteredProducts.length === 0 ? (
-
-            <div className="rounded-3xl border border-dashed border-yellow-500/30 bg-[#111] p-10 text-center">
-
-              <div className="text-5xl">
-                🥃
+            <div className="border-t border-white/10 pt-4">
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
               </div>
 
-              <h3 className="mt-4 font-black">
-                Nenhum produto por aqui
-              </h3>
+              <div className="mt-2 flex justify-between text-sm text-gray-400">
+                <span>Entrega</span>
+                <span>
+                  {orderType === "delivery"
+                    ? deliveryAreas.some((area) => area.name === neighborhood)
+                      ? deliveryFee === 0 ? "Grátis" : formatPrice(deliveryFee)
+                      : "Selecione o bairro"
+                    : "Retirada"}
+                </span>
+              </div>
 
-              <p className="mt-2 text-sm text-gray-500">
-                Novos produtos aparecerão nesta categoria.
-              </p>
-
+              <div className="mt-4 flex items-end justify-between border-t border-white/10 pt-4">
+                <div>
+                  <p className="text-xs text-gray-500">TOTAL</p>
+                  <p className="text-2xl font-black text-yellow-400">{formatPrice(total)}</p>
+                </div>
+                <span className="rounded-full border border-green-500/20 bg-green-500/5 px-3 py-1 text-[10px] font-bold text-green-400">
+                  🔒 COMPRA SEGURA
+                </span>
+              </div>
             </div>
-
-          ) : (
-
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-
-              {filteredProducts.map((product) => {
-                const salePrice =
-                  product.promotional_price ??
-                  product.price;
-
-                const cartItem = cart.find(
-                  (item) => item.id === product.id
-                );
-
-                const hasDiscount =
-                  product.promotional_price !== null;
-
-              const discountPercent =
-  hasDiscount && product.promotional_price !== null
-    ? Math.round(
-        ((product.price - product.promotional_price) /
-          product.price) *
-          100
-      )
-    : 0;
-
-                return (
-                  <article
-                    key={product.id}
-                    className="overflow-hidden rounded-3xl border border-white/10 bg-[#131313] shadow-xl"
-                  >
-
-                    {/* FOTO */}
-                    <div className="relative flex aspect-square items-center justify-center bg-[#0b0b0b]">
-
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="h-full w-full object-contain p-4"
-                        />
-                      ) : (
-                        <span className="text-7xl">
-                          🥃
-                        </span>
-                      )}
-
-                      {(product.on_sale || hasDiscount) && (
-  <span className="absolute left-3 top-3 rounded-full bg-yellow-400 px-3 py-1 text-[10px] font-black text-black shadow-lg">
-    🔥 OFERTA
-    {discountPercent > 0 && ` • -${discountPercent}%`}
-  </span>
-)}
-
-                      {product.stock > 0 &&
-                        product.stock <= 5 && (
-                          <span className="absolute right-3 top-3 rounded-full bg-red-500/90 px-2 py-1 text-[10px] font-black text-white">
-                            ÚLTIMOS
-                          </span>
-                        )}
-
-                    </div>
-
-                    <div className="p-4">
-
-                      <h3 className="line-clamp-2 min-h-12 font-black">
-                        {product.name}
-                      </h3>
-
-                      {product.volume && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          {product.volume}
-                        </p>
-                      )}
-
-                      <div className="mt-3">
-
-                        {hasDiscount && (
-                          <p className="text-xs text-gray-500 line-through">
-                            {formatPrice(product.price)}
-                          </p>
-                        )}
-
-                        <p className="text-xl font-black text-yellow-400">
-                          {formatPrice(salePrice)}
-                        </p>
-
-                      </div>
-
-                      {product.stock <= 0 ? (
-
-                        <button
-                          disabled
-                          className="mt-4 w-full rounded-2xl bg-gray-800 px-3 py-3 text-sm font-black text-gray-500"
-                        >
-                          ESGOTADO
-                        </button>
-
-                      ) : cartItem ? (
-
-                        <div className="mt-4 flex items-center justify-between rounded-2xl border border-yellow-500/30 bg-black p-1">
-
-                          <button
-                            onClick={() =>
-                              decreaseItem(product.id)
-                            }
-                            className="h-10 w-10 rounded-xl bg-[#202020] text-xl font-black"
-                          >
-                            −
-                          </button>
-
-                          <span className="font-black text-yellow-400">
-                            {cartItem.quantity}
-                          </span>
-
-                          <button
-                            onClick={() =>
-                              increaseItem(product.id)
-                            }
-                            disabled={
-                              cartItem.quantity >=
-                              product.stock
-                            }
-                            className="h-10 w-10 rounded-xl bg-yellow-400 text-xl font-black text-black disabled:opacity-40"
-                          >
-                            +
-                          </button>
-
-                        </div>
-
-                      ) : (
-
-                        <button
-                          onClick={() =>
-                            addToCart(product)
-                          }
-                          className="mt-4 w-full rounded-2xl bg-yellow-400 px-3 py-3 text-sm font-black text-black"
-                        >
-                          + ADICIONAR
-                        </button>
-
-                      )}
-
-                    </div>
-
-                  </article>
-                );
-              })}
-
-            </div>
-
-          )}
-
+          </div>
         </section>
 
-        {/* BENEFÍCIOS */}
-        <section className="grid grid-cols-3 gap-2 px-4 pt-8 text-center">
-
-          <div className="rounded-2xl bg-[#111] p-4">
-            <div className="text-2xl">🚚</div>
-            <p className="mt-2 text-xs font-bold">
-              Entrega rápida
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-[#111] p-4">
-            <div className="text-2xl">❄️</div>
-            <p className="mt-2 text-xs font-bold">
-              Bebida gelada
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-[#111] p-4">
-            <div className="text-2xl">🔒</div>
-            <p className="mt-2 text-xs font-bold">
-              Compra segura
-            </p>
-          </div>
-
-        </section>
-
-                {/* RODAPÉ */}
-        <footer className="px-4 py-10 text-center">
-
-          <p className="font-black text-yellow-400">
-            ANDINHO DO COMBO
-          </p>
-
-          <p className="mt-2 text-xs text-gray-600">
-            Bebidas • Combos • Delivery
-          </p>
-
-          <p className="mt-4 text-xs text-gray-600">
-            🔞 Venda proibida para menores de 18 anos.
-            <br />
-            Beba com moderação.
-          </p>
-
-        </footer>
-
+        <div className="py-7 text-center text-xs text-gray-600">
+          🔞 Venda proibida para menores de 18 anos.
+          <br />
+          Beba com moderação.
+        </div>
       </div>
 
-      {/* CARRINHO FIXO */}
-      {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-yellow-500/10 bg-black/95 p-4 backdrop-blur">
-
-          <button
-            onClick={() =>
-              (window.location.href = "/carrinho")
-            }
-            className="mx-auto flex w-full max-w-md items-center justify-between rounded-2xl bg-yellow-400 px-5 py-4 text-black shadow-2xl"
-          >
-
-            <div className="text-left">
-
-              <p className="text-xs font-bold">
-                🛒 {totalItems}{" "}
-                {totalItems === 1
-                  ? "item"
-                  : "itens"}
-              </p>
-
-              <p className="text-lg font-black">
-                {formatPrice(cartTotal)}
-              </p>
-
-            </div>
-
-            <span className="font-black">
-              VER CARRINHO →
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-yellow-500/10 bg-black/95 p-4 backdrop-blur">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-3 flex items-center justify-between px-1">
+            <span className="text-xs text-gray-500">
+              Total do pedido
             </span>
 
-          </button>
+            <span className="text-xl font-black text-yellow-400">
+              {formatPrice(total)}
+            </span>
+          </div>
 
+          {!isOpen ? (
+            <button
+              disabled
+              className="w-full rounded-2xl bg-gray-800 px-5 py-4 font-black text-gray-500"
+            >
+              🔴 LOJA FECHADA • ABRIMOS ÀS 14:00
+            </button>
+          ) : (
+            <div className="grid gap-2">
+              <button
+                onClick={payOnline}
+                disabled={payingOnline || sending}
+                className="flex w-full items-center justify-between rounded-2xl bg-[#009ee3] px-5 py-4 font-black text-white shadow-xl disabled:opacity-50"
+              >
+                <span>💳 PAGAR ONLINE</span>
+                <span>
+                  {payingOnline
+                    ? "ABRINDO..."
+                    : "MERCADO PAGO →"}
+                </span>
+              </button>
+
+              <button
+                onClick={finishOrder}
+                disabled={sending || payingOnline}
+                className="flex w-full items-center justify-between rounded-2xl bg-yellow-400 px-5 py-4 font-black text-black shadow-xl disabled:opacity-50"
+              >
+                <span>💬 WHATSAPP</span>
+                <span>
+                  {sending
+                    ? "ENVIANDO..."
+                    : "FINALIZAR PEDIDO →"}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
-      )}
-
+      </div>
     </main>
   );
-                }
+}
